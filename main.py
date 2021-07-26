@@ -62,14 +62,22 @@ def train(config):
     ]
     start_time = time.time()
     print('训练开始')
-    history = model.fit_generator(
+#     history = model.fit_generator(
+#         train_iter,
+#         steps_per_epoch=len(train_iter) // 32,
+#         epochs=config['epochs'],
+#         validation_data=dev_iter,
+#         validation_steps=len(dev_iter),
+# #         class_weight=class_weight,
+#         callbacks=my_callbacks
+#     )
+    history = model.fit(
         train_iter,
-        steps_per_epoch=len(train_iter) // 32,
+        steps_per_epoch=len(train_iter) // config['batch_size'],
         epochs=config['epochs'],
+        callbacks=my_callbacks,
         validation_data=dev_iter,
-        validation_steps=len(dev_iter),
-#         class_weight=class_weight,
-        callbacks=my_callbacks
+        validation_steps=len(dev_iter) // config['batch_size'],
     )
     
     model.save_weights(config['model_file2'])
