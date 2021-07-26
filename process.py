@@ -1,4 +1,6 @@
 from sklearn.utils.class_weight import compute_class_weight
+import os
+os.environ['TF_KERAS'] = '1'
 from bert4keras.tokenizers import Tokenizer
 from bert4keras.snippets import sequence_padding
 import numpy as np
