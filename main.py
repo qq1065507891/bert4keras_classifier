@@ -1,29 +1,23 @@
-from bert4keras.optimizers import Adam, extend_with_piecewise_linear_lr
-from keras.callbacks import EarlyStopping, ModelCheckpoint
-from sklearn.metrics import accuracy_score, f1_score, classification_report, confusion_matrix
-
-import tensorflow as tf
 import os
-import numpy as np
+import time
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+from tensorflow.keras.optimizers import Adam
+from sklearn.metrics import classification_report, confusion_matrix
 
-
+from models import BertClassifier
 from config import config
-from process import build_iteration, read_file, process_text, process_sing_text, process_predict_text
-from models import Bert_classifier
+from utlis import training_curve, build_iteration, get_time_idf
+from process import read_file, process_text, process_single_text, process_predict_text
+
+os.environ['TF_KERAS'] = '1'
 
 
 def init_model(config):
-    model = Bert_classifier(config).build_model()
-
-    AdamLR = extend_with_piecewise_linear_lr(Adam, name='AdamLR')
+    model = BertClassifier(config, dropout_rate=0.3).build_model()
 
     model.compile(
         loss='sparse_categorical_crossentropy',
-        # optimizer=Adam(1e-5),  # 用足够小的学习率
-        optimizer=AdamLR(learning_rate=1e-3, lr_schedule={
-            1000: 1,
-            2000: 0.1
-        }),
+        optimizer=Adam(1e-5),  # 用足够小的学习率
         metrics=['accuracy'],
     )
     return model
@@ -36,6 +30,8 @@ def load_model(config):
 
 
 def train(config):
+    print('加载数据')
+    start_time = time.time()
     train = read_file(config['train_path'])
     test = read_file(config['test_path'])
     dev = read_file(config['dev_path'])
@@ -47,50 +43,66 @@ def train(config):
     train_iter = build_iteration(train, config)
     test_iter = build_iteration(test, config)
     dev_iter = build_iteration(dev, config)
-
+    
+    end_time = get_time_idf(start_time)
+    print('加载完成，用时：', end_time)
+    
     if os.path.exists(config['model_file']):
         model = load_model(config)
+        print('加载已有模型')
     else:
         model = init_model(config)
-    cal_backs = [
-        EarlyStopping(monitor='val_loss', patience=10, verbose=1, mode='max'),
-        ModelCheckpoint(config['model_file'], monitor='val_loss', verbose=1, save_best_only=True,
-                        mode='max', period=1, save_weights_only=True)
+        print('初始化模型')
+    
+    my_callbacks = [
+        ModelCheckpoint(config['model_file'], monitor='val_accuracy', mode='max', save_best_only=True,
+                        save_weights_only=True,
+                        verbose=1),
+#         EarlyStopping(monitor='val_accuracy', mode='max', patience=10, verbose=1)
     ]
-
-    histroy = model.fit_generator(
+    start_time = time.time()
+    print('训练开始')
+    history = model.fit_generator(
         train_iter,
         steps_per_epoch=len(train_iter) // 32,
-        epochs=50,
+        epochs=config['epochs'],
         validation_data=dev_iter,
-        validation_steps=len(dev_iter) // 32,
-        callbacks=cal_backs,
-        class_weight=class_weight,
+        validation_steps=len(dev_iter),
+#         class_weight=class_weight,
+        callbacks=my_callbacks
     )
+    
     model.save_weights(config['model_file2'])
-    x = model.evaluate_generator(
-        test_iter,
-        steps=32)
-    print(x)
+    end_time = get_time_idf(start_time)
+    print('训练完成, 耗时：', end_time)
+    
+    training_curve(history.history['loss'], history.history['accuracy'],
+                   history.history['val_loss'], history.history['accuracy'])
+    
+    print(model.evaluate_generator(test_iter, len(test_iter)))
 
 
-def predict_single_text(texts, config):
-    contents = process_sing_text(texts)
+def predict_single_text(text, config):
+    contents = process_single_text(text)
     iter_text = build_iteration(contents, config)
     model = load_model(config)
-    pre = model.predict_generator(iter_text, steps=len(iter_text))
-    pre = [item.argmax() for item in pre]
-    return pre
+    pre = model.predict_generator(iter_text, steps=len(iter_text)).argmax()
+    print(pre)
 
 
 def predict_text(texts, config):
+    start_time = time.time()
     contents = process_predict_text(texts)
     iter_text = build_iteration(contents, config)
     model = load_model(config)
-    pre = model.predict_generator(iter_text, steps=len(iter_text))
+    pre = model.predict_generator(
+        iter_text,
+        steps=len(iter_text)
+    )
     pre = [item.argmax() for item in pre]
+    end_time = get_time_idf(start_time)
+    print('用时: ', end_time)
     return pre
 
-
-if __name__ == '__main__':
+if __name__=='__main__':
     train(config)
