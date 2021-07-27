@@ -23,19 +23,23 @@ def read_file(path):
 
 def process_sing_text(text):
     tokenizer = Tokenizer(config['dict_path'], do_lower_case=True)
-    contents = []
+    
     token_ids, segment_ids = tokenizer.encode(text, maxlen=config['maxlen'])
-    contents.append((token_ids, segment_ids, [999]))
+    token_ids = sequence_padding([token_ids])
+    segment_ids = sequence_padding([segment_ids])
+    contents=(token_ids, segment_ids)
     return contents
 
 
 def process_predict_text(texts):
     tokenizer = Tokenizer(config['dict_path'], do_lower_case=True)
-    contents = []
     for text in texts:
         token_ids, segment_ids = tokenizer.encode(text, maxlen=config['maxlen'])
         contents.append((token_ids, segment_ids, [0]))
-    return contents
+    token_ids = sequence_padding([item[0] for item in contents])
+    segment_ids = sequence_padding([item[1] for item in contents])
+    content = (token_dis, segment_ids)
+    return content
 
 
 def process_text(datas, config, train=None):
