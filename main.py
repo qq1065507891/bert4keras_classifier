@@ -58,7 +58,7 @@ def train(config):
         ModelCheckpoint(config['model_file'], monitor='val_accuracy', mode='max', save_best_only=True,
                         save_weights_only=True,
                         verbose=1),
-#         EarlyStopping(monitor='val_accuracy', mode='max', patience=10, verbose=1)
+        EarlyStopping(monitor='val_accuracy', mode='max', patience=10, verbose=1)
     ]
     start_time = time.time()
     print('训练开始')
@@ -92,21 +92,16 @@ def train(config):
 
 def predict_single_text(text, config):
     contents = process_single_text(text)
-    iter_text = build_iteration(contents, config)
     model = load_model(config)
-    pre = model.predict_generator(iter_text, steps=len(iter_text)).argmax()
+    pre = model.predict(contents).argmax()
     print(pre)
 
 
 def predict_text(texts, config):
     start_time = time.time()
     contents = process_predict_text(texts)
-    iter_text = build_iteration(contents, config)
     model = load_model(config)
-    pre = model.predict_generator(
-        iter_text,
-        steps=len(iter_text)
-    )
+    pre = model.predict(contents)
     pre = [item.argmax() for item in pre]
     end_time = get_time_idf(start_time)
     print('用时: ', end_time)
